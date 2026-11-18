@@ -24,14 +24,12 @@ export function revokeDelegation(id: string): boolean {
   return policies.delete(id);
 }
 
-function findActivePolicyForAgent(agentId: string): StoredPolicy | undefined {
+// Oldest first (Map keeps insertion order).
+function activePoliciesForAgent(agentId: string): StoredPolicy[] {
   const now = Math.floor(Date.now() / 1000);
-  for (const stored of policies.values()) {
-    if (stored.policy.agentId === agentId && stored.policy.expiresAt > now) {
-      return stored;
-    }
-  }
-  return undefined;
+  return [...policies.values()].filter(
+    (stored) => stored.policy.agentId === agentId && stored.policy.expiresAt > now,
+  );
 }
 
 function matchesResource(pattern: string, resource: string): boolean {
@@ -50,16 +48,34 @@ export interface AuthorizationCheck {
   policy?: DelegationPolicy;
 }
 
+// An agent can hold several delegations at once (e.g. a standing policy plus a one-off approval
+// for a single payment). A payment is allowed if any one of them covers it; when none does, the
+// reason reported is the oldest policy's.
 export function authorize(
   agentId: string,
   resource: string,
   chain: Network,
   amount: bigint,
 ): AuthorizationCheck {
-  const stored = findActivePolicyForAgent(agentId);
-  if (!stored) {
+  const candidates = activePoliciesForAgent(agentId);
+  if (candidates.length === 0) {
     return { ok: false, reason: "no active delegation policy for agent" };
   }
+  let firstFailure: AuthorizationCheck | undefined;
+  for (const stored of candidates) {
+    const result = checkPolicy(stored, resource, chain, amount);
+    if (result.ok) return result;
+    firstFailure ??= result;
+  }
+  return firstFailure!;
+}
+
+function checkPolicy(
+  stored: StoredPolicy,
+  resource: string,
+  chain: Network,
+  amount: bigint,
+): AuthorizationCheck {
   const { policy } = stored;
 
   if (!policy.allowedResources.some((pattern) => matchesResource(pattern, resource))) {
