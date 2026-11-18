@@ -46,7 +46,7 @@ export function requirePayment(opts: PaymentOptions) {
       asset: config.assetAddress,
       payTo: config.payToAddress,
       maxTimeoutSeconds: 300,
-      extra: { name: config.tokenName, version: "1" },
+      extra: { name: config.tokenName, version: config.tokenVersion },
     };
 
     const header = req.headers["x-payment"];
