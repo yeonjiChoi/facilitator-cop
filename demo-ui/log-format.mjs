@@ -7,7 +7,13 @@ export const SERVICES = {
   facilitator: { label: "Facilitator", ansi: 33 },
 };
 
-const DECIMALS = 6n;
+let DECIMALS = 6n;
+let SYMBOL = "DEMO";
+// Set once at startup from the payment token's contract.
+export function setTokenSymbol(symbol, decimals) {
+  SYMBOL = symbol;
+  DECIMALS = BigInt(decimals);
+}
 function demo(raw) {
   if (raw == null) return "?";
   const v = BigInt(raw);
@@ -27,9 +33,9 @@ const pathOf = (url) => {
 // event -> [level, text]. Levels: info | ok | warn | error ("ok" marks the milestones).
 const EVENTS = {
   // Resource Server
-  "payment.required": (e) => ["info", `402 결제 요구 · ${e.method} ${e.path} · ${demo(e.amount)} DEMO`],
+  "payment.required": (e) => ["info", `402 결제 요구 · ${e.method} ${e.path} · ${demo(e.amount)} ${SYMBOL}`],
   "payment.malformed": () => ["warn", "X-PAYMENT 헤더 형식 오류 → 402"],
-  "payment.received": (e) => ["info", `X-PAYMENT 수신 · ${demo(e.amount)} DEMO (payer ${short(e.payer)})`],
+  "payment.received": (e) => ["info", `X-PAYMENT 수신 · ${demo(e.amount)} ${SYMBOL} (payer ${short(e.payer)})`],
   "payment.replay_blocked": () => ["warn", "이미 사용된 결제 → 402 차단"],
   "payment.rejected": (e) => ["warn", `결제 거부 → 402 · ${e.reason}`],
   "payment.verified": () => ["ok", "검증 통과 → API 응답 제공"],
@@ -41,24 +47,24 @@ const EVENTS = {
   // Agent Wallet
   "wallet.created": (e) => ["info", `에이전트 지갑 생성 · ${short(e.address)} (Key Custody: ${e.provider})`],
   "delegation.created": (e) => ["info",
-    `위임 정책 발급 · 건당 ${demo(e.maxAmountPerTx)} / ${e.windowSeconds}초 누적 ${demo(e.maxAmountPerWindow)} DEMO · ${e.allowedResources.map(pathOf).join(", ")}`],
+    `위임 정책 발급 · 건당 ${demo(e.maxAmountPerTx)} / ${e.windowSeconds}초 누적 ${demo(e.maxAmountPerWindow)} ${SYMBOL} · ${e.allowedResources.map(pathOf).join(", ")}`],
   "delegation.revoked": (e) => ["info", `위임 정책 철회 · ${e.delegationId.slice(0, 8)}`],
-  "sign.requested": (e) => ["info", `결제 서명 요청 · ${demo(e.amount)} DEMO · ${pathOf(e.resource)}`],
+  "sign.requested": (e) => ["info", `결제 서명 요청 · ${demo(e.amount)} ${SYMBOL} · ${pathOf(e.resource)}`],
   "policy.denied": (e) => ["warn", `[Permission Delegation] 거부 · ${e.reason}`],
   "policy.approved": (e) => ["ok",
-    `[Permission Delegation] 승인 · 건당 한도 ${demo(e.maxAmountPerTx)}, 누적 ${demo(e.spentInWindow)} + ${demo(e.amount)} / ${demo(e.maxAmountPerWindow)} DEMO`],
+    `[Permission Delegation] 승인 · 건당 한도 ${demo(e.maxAmountPerTx)}, 누적 ${demo(e.spentInWindow)} + ${demo(e.amount)} / ${demo(e.maxAmountPerWindow)} ${SYMBOL}`],
   "approval.issued": (e) => ["info", `[Permission Delegation] 승인 토큰(JWT, ${e.ttlSeconds}초) 발급 → Key Custody`],
   "custody.signed": (e) => ["ok", `[Key Custody] 토큰 검증 후 EIP-3009 서명 · signer ${short(e.signer)}`],
   "custody.failed": (e) => ["error", `[Key Custody] 서명 거부 · ${e.reason}`],
 
   // Facilitator
-  "verify.passed": (e) => ["ok", `검증 통과 · 서명·금액·수신자·잔액·nonce 확인 · ${demo(e.amount)} DEMO`],
+  "verify.passed": (e) => ["ok", `검증 통과 · 서명·금액·수신자·잔액·nonce 확인 · ${demo(e.amount)} ${SYMBOL}`],
   "verify.failed": (e) => ["warn", `검증 실패 · ${e.reason}`],
-  "settle.requested": (e) => ["info", `정산 요청 수신 · ${demo(e.amount)} DEMO`],
+  "settle.requested": (e) => ["info", `정산 요청 수신 · ${demo(e.amount)} ${SYMBOL}`],
   "settle.duplicate": () => ["warn", "이미 제출된 결제 → 중복 정산 생략"],
   "settle.submitted": (e) => ["info", `transferWithAuthorization 전송 · tx ${short(e.txHash)} (가스: Facilitator ${short(e.settler)})`],
   "settle.confirmed": (e) => ["ok",
-    `블록 #${e.blockNumber} 확정 · ${demo(e.amount)} DEMO → ${short(e.to)} · ${Number(e.gasUsed).toLocaleString()} gas`],
+    `블록 #${e.blockNumber} 확정 · ${demo(e.amount)} ${SYMBOL} → ${short(e.to)} · ${Number(e.gasUsed).toLocaleString()} gas`],
   "settle.reverted": (e) => ["error", `정산 트랜잭션 revert · tx ${short(e.txHash)}`],
   "settle.failed": (e) => ["error", `정산 실패 · ${e.reason}`],
 };

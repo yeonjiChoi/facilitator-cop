@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>지갑 설정 · 내 AI 에이전트</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .page { max-width:1240px; margin:0 auto; }
+  .head { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+  .head b { font-size:19px; }
+  .grid { display:grid; grid-template-columns:minmax(0, 1fr) 440px; gap:16px; align-items:start; }
+  @media (max-width: 960px) { .grid { grid-template-columns:1fr; } }
+  .col { display:grid; gap:16px; align-content:start; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:15px 0; border-top:1px solid var(--border); flex-wrap:wrap; }
+  .row:first-of-type { border-top:0; padding-top:4px; }
+  .row > b { font-size:14.5px; font-weight:600; }
+  .val { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .amount { display:flex; align-items:center; border:1px solid var(--border); border-radius:10px; padding:0 12px; background:var(--panel); }
+  .amount:focus-within { border-color:var(--accent); }
+  .amount input { width:90px; border:0; outline:0; padding:8px 0; text-align:right; font-weight:700; font-size:16px; background:transparent; }
+  .amount span { font-weight:700; margin-left:6px; }
+  .seg { display:inline-flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .seg button { border:0; border-radius:0; padding:7px 14px; font-weight:400; }
+  .seg button + button { border-left:1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background:var(--accent); color:#fff; font-weight:600; }
+  .sw { width:44px; height:26px; border-radius:13px; background:#cfd5dd; position:relative; flex:none; border:0; padding:0; }
+  .sw::after { content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.2); transition:left .15s; }
+  .sw[aria-checked="true"] { background:var(--accent); } .sw[aria-checked="true"]::after { left:21px; }
+  .shop { display:flex; align-items:center; gap:12px; padding:6px 0 12px; }
+  .logo { width:40px; height:40px; border-radius:10px; display:grid; place-items:center; font-size:20px; flex:none; background:var(--sec-soft); }
+  .shop .nm { flex:1; } .shop .nm b { display:block; } .shop .nm small { color:var(--muted); font-size:12.5px; }
+  .add { display:flex; align-items:center; gap:12px; padding-top:12px; color:var(--muted); border-top:1px solid var(--border); }
+  .add span:first-child { width:40px; height:40px; border-radius:10px; border:1.5px dashed var(--border); display:grid; place-items:center; font-size:20px; }
+  .actions { display:flex; justify-content:flex-end; align-items:center; gap:8px; flex-wrap:wrap; }
+  .actions .msg { margin-right:auto; font-size:13px; }
+  .card { background:linear-gradient(135deg,#2f5bd3,#6a48c9); color:#fff; border-radius:16px; padding:20px; }
+  .card small { opacity:.85; font-size:12.5px; }
+  .card .bal { font-size:32px; font-weight:800; margin:2px 0 14px; }
+  .card .bal span { font-size:16px; font-weight:600; opacity:.9; }
+  .card .foot { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; flex-wrap:wrap; }
+  .card .acts { display:flex; gap:8px; margin-top:14px; }
+  .card .acts button { flex:1; background:rgba(255,255,255,.18); border:0; color:#fff; }
+  .card .note { font-size:12.5px; margin-top:10px; opacity:.95; min-height:1em; }
+  .card .note a { color:#fff; text-decoration:underline; }
+  .hist .ic { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; font-size:16px; background:var(--sec-soft); flex:none; }
+  .off { opacity:.5; pointer-events:none; }
+</style>
+</head>
+<body>
+<div class="top">
+  <span class="brand"><span class="lg">🤖</span><span><b>내 AI 에이전트</b><small>대화하면 알아서 결제해요</small></span></span>
+  <span class="net">Ethereum Sepolia</span>
+</div>
+<div class="wrap page">
+  <div class="head"><a class="btn" href="/agent">← 채팅으로</a><b>지갑 설정</b></div>
+  <div class="grid">
+    <div class="col">
+      <section class="panel" id="limits">
+        <h2>결제 한도</h2>
+        <div class="row"><b>1회 결제 한도</b><label class="amount"><input id="perTx" type="number" min="0" step="0.01" inputmode="decimal" aria-label="1회 결제 한도"><span>DEMO</span></label></div>
+        <div class="row"><b>기간 한도</b><span class="val">
+          <span class="seg" id="window"><button type="button" data-v="1800">30분</button><button type="button" data-v="3600">1시간</button><button type="button" data-v="86400">하루</button></span>
+          <label class="amount"><input id="perWindow" type="number" min="0" step="0.01" inputmode="decimal" aria-label="기간 한도"><span>DEMO</span></label></span></div>
+        <div class="row"><b>한도를 넘으면 나에게 물어보기</b><button class="sw" id="ask" role="switch" type="button" aria-label="한도를 넘으면 나에게 물어보기"></button></div>
+        <div class="row"><b>권한 자동 만료</b><span class="seg" id="expiry"><button type="button" data-v="1h">1시간</button><button type="button" data-v="24h">24시간</button><button type="button" data-v="7d">7일</button><button type="button" data-v="none">안 함</button></span></div>
+      </section>
+      <section class="panel" id="places">
+        <h2>사용처</h2>
+        <div class="shop"><span class="logo">📈</span><span class="nm"><b>데모증권</b><small>실시간 시세 · 잔고 조회 · 주식 주문</small></span><button class="sw" id="securities" role="switch" type="button" aria-label="데모증권"></button></div>
+        <div class="add"><span>+</span><span>사용처 추가</span></div>
+      </section>
+      <div class="actions">
+        <span class="msg" id="save-msg"></span>
+        <button type="button" id="toggle-all" style="color:var(--bad)">모든 권한 끄기</button>
+        <button type="button" class="p" id="save">저장</button>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card">
+        <small>내 에이전트 지갑</small>
+        <div class="bal num"><span id="bal" style="font-size:inherit;opacity:1;font-weight:inherit">…</span> <span>DEMO</span></div>
+        <div class="foot"><span class="addr" id="addr" style="opacity:.9">…</span><span>가스비 <span id="eth">…</span> ETH</span></div>
+        <div class="acts"><button type="button" id="topup">충전</button><button type="button" id="copy">주소 복사</button></div>
+        <div class="note" id="card-note"></div>
+      </div>
+      <section class="panel">
+        <h2><span id="usage-title">이번 기간 사용</span><small class="num" id="usage">…</small></h2>
+        <div class="bar" id="usage-bar"><i style="width:0"></i></div>
+      </section>
+      <section class="panel list hist">
+        <h2>결제 내역</h2>
+        <div id="history"><div class="empty">아직 결제 내역이 없어요.</div></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const DECIMALS = 6n;
+const $ = (id) => document.getElementById(id);
+// Labels say "DEMO"; once the server reports the payment token, its symbol replaces it everywhere.
+let SYM = "DEMO";
+function relabel(root) {
+  if (SYM === "DEMO" || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode());) if (n.nodeValue.includes("DEMO")) n.nodeValue = n.nodeValue.replace(/DEMO/g, SYM);
+}
+new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) relabel(n.nodeType === Node.TEXT_NODE ? n.parentNode : n); })
+  .observe(document.body, { childList: true, subtree: true });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function demo(raw) {
+  if (raw == null) return "–";
+  const v = BigInt(raw), unit = 10n ** DECIMALS;
+  const frac = (v % unit).toString().padStart(Number(DECIMALS), "0").replace(/0+$/, "");
+  return (v / unit).toString() + (frac ? "." + frac : "");
+}
+const toRaw = (v) => {
+  const [i, f = ""] = String(v).trim().split(".");
+  return (BigInt(i || "0") * 10n ** DECIMALS + BigInt((f + "000000").slice(0, 6) || "0")).toString();
+};
+const short = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
+const when = (t) => {
+  const d = new Date(t), today = new Date().toDateString() === d.toDateString();
+  const hm = d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return today ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+};
+const ICON = (label) => /시세/.test(label) ? "📈" : /잔고/.test(label) ? "💼" : /주문/.test(label) ? "🧾" : "💳";
+async function api(method, url, body) {
+  const res = await fetch(url, { method, headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data;
+}
+
+let summary = null;
+let form = null; // the values being edited
+let dirty = false;
+
+function pick(segId, value) {
+  $(segId).querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.v === String(value))));
+}
+function fillForm(st) {
+  form = { ...st };
+  $("perTx").value = demo(st.perTx);
+  $("perWindow").value = demo(st.perWindow);
+  pick("window", st.windowSeconds);
+  pick("expiry", st.expiry);
+  $("ask").setAttribute("aria-checked", String(st.askOnExceed));
+  $("securities").setAttribute("aria-checked", String(st.securities));
+  renderEnabled();
+}
+function renderEnabled() {
+  const on = form.enabled;
+  $("limits").classList.toggle("off", !on);
+  $("places").classList.toggle("off", !on);
+  $("toggle-all").textContent = on ? "모든 권한 끄기" : "권한 다시 켜기";
+  $("toggle-all").style.color = on ? "var(--bad)" : "var(--accent)";
+}
+const markDirty = () => { dirty = true; $("save-msg").textContent = "저장하지 않은 변경이 있어요"; $("save-msg").className = "msg muted"; };
+
+$("window").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; form.windowSeconds = Number(b.dataset.v); pick("window", b.dataset.v); markDirty(); });
+$("expiry").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; form.expiry = b.dataset.v; pick("expiry", b.dataset.v); markDirty(); });
+for (const id of ["ask", "securities"]) {
+  $(id).addEventListener("click", () => {
+    const next = $(id).getAttribute("aria-checked") !== "true";
+    $(id).setAttribute("aria-checked", String(next));
+    form[id === "ask" ? "askOnExceed" : "securities"] = next;
+    markDirty();
+  });
+}
+$("perTx").addEventListener("input", markDirty);
+$("perWindow").addEventListener("input", markDirty);
+
+async function saveSettings(patch) {
+  $("save").disabled = true;
+  try {
+    summary = await api("POST", "/api/agent/settings", patch);
+    dirty = false;
+    fillForm(summary.settings);
+    render();
+    $("save-msg").textContent = "저장했어요";
+    $("save-msg").className = "msg";
+    $("save-msg").style.color = "var(--ok)";
+  } catch (err) {
+    $("save-msg").textContent = `저장하지 못했어요: ${err.message}`;
+    $("save-msg").className = "msg error";
+  } finally {
+    $("save").disabled = false;
+  }
+}
+$("save").onclick = () => {
+  if (!/^\d+(\.\d{0,6})?$/.test($("perTx").value.trim()) || !/^\d+(\.\d{0,6})?$/.test($("perWindow").value.trim())) {
+    $("save-msg").textContent = "금액은 소수점 6자리까지 숫자로 입력해 주세요"; $("save-msg").className = "msg error"; return;
+  }
+  saveSettings({ ...form, perTx: toRaw($("perTx").value), perWindow: toRaw($("perWindow").value) });
+};
+$("toggle-all").onclick = () => { form.enabled = !form.enabled; renderEnabled(); saveSettings({ enabled: form.enabled }); };
+
+$("copy").onclick = async () => {
+  try { await navigator.clipboard.writeText(summary.address); $("card-note").textContent = "주소를 복사했어요"; }
+  catch { $("card-note").textContent = summary.address; }
+};
+$("topup").onclick = async () => {
+  // Test USDC comes from Circle's faucet: copy the agent's address and open it.
+  if (summary.token?.faucet) {
+    try { await navigator.clipboard.writeText(summary.address); } catch {}
+    window.open(summary.token.faucet, "_blank", "noopener");
+    $("card-note").textContent = `지갑 주소를 복사했어요. Faucet에서 Ethereum Sepolia를 고르고 주소를 붙여 넣으면 ${SYM}가 들어와요.`;
+    return;
+  }
+  $("topup").disabled = true;
+  $("card-note").textContent = "1 DEMO 충전 중… (블록 확정까지 10~20초)";
+  try {
+    const { txHash } = await api("POST", "/api/topup");
+    $("card-note").innerHTML = `충전했어요 · <a href="${summary.explorer}/tx/${txHash}" target="_blank" rel="noopener">${short(txHash)} ↗</a>`;
+    refresh();
+  } catch (err) {
+    $("card-note").textContent = `충전하지 못했어요: ${err.message}`;
+  } finally {
+    $("topup").disabled = !summary?.topUpAvailable && !summary?.token?.faucet;
+  }
+};
+
+const WINDOW_NAME = { 1800: "30분", 3600: "1시간", 86400: "하루" };
+function render() {
+  const s = summary, st = s.settings;
+  $("bal").textContent = demo(s.demo);
+  $("addr").textContent = short(s.address);
+  $("eth").textContent = (Number(BigInt(s.eth)) / 1e18).toFixed(4).replace(/\.?0+$/, "") || "0";
+  $("topup").disabled = !s.topUpAvailable && !s.token?.faucet;
+  $("topup").title = s.token?.faucet ? "Circle 테스트넷 faucet에서 받기" : s.topUpAvailable ? "" : "TOKEN_OWNER_PRIVATE_KEY가 필요해요";
+  $("usage-title").textContent = `이번 ${WINDOW_NAME[st.windowSeconds] ?? `${st.windowSeconds}초`} 사용`;
+  $("usage").textContent = `${demo(s.usage)} / ${demo(st.perWindow)} DEMO`;
+  const ratio = Math.min(1, Number(BigInt(s.usage)) / Math.max(1, Number(BigInt(st.perWindow))));
+  $("usage-bar").querySelector("i").style.width = `${ratio * 100}%`;
+  $("usage-bar").classList.toggle("over", ratio >= 1);
+
+  let lastDay = null;
+  const today = new Date().toDateString();
+  $("history").innerHTML = s.history.length ? s.history.map((h) => {
+    const day = new Date(h.at).toDateString();
+    const divider = day !== lastDay && day !== today ? `<div class="muted" style="font-size:12px;padding:10px 0 2px;border-top:1px solid var(--border)">${new Date(h.at).toLocaleDateString("ko-KR", { month: "long", day: "numeric" })}</div>` : "";
+    lastDay = day;
+    let right;
+    if (h.kind === "paid") {
+      const st = h.status === "settled" && h.txHash
+        ? `<a class="addr" href="${s.explorer}/tx/${h.txHash}" target="_blank" rel="noopener">${short(h.txHash)} ↗</a>`
+        : h.status === "failed" ? `<span class="badge b-bad">정산 실패</span>` : `<span class="badge b-muted">정산 중</span>`;
+      right = `${h.approved ? `<span class="badge b-ok">승인함</span>` : ""}${st}<span class="amt num">−${demo(h.amount)}</span>`;
+    } else if (h.kind === "pending") right = `<span class="badge b-warn">승인 대기</span><span class="amt num">${demo(h.amount)} DEMO</span>`;
+    else if (h.kind === "declined") right = `<span class="badge b-bad">거절함</span><span class="amt num muted">${demo(h.amount)} DEMO</span>`;
+    else right = `<span class="badge b-bad">결제 안 함</span><span class="amt num muted">${demo(h.amount)} DEMO</span>`;
+    return `${divider}<div class="it"><span class="ic">${ICON(h.label)}</span><span class="nm"><b>${esc(h.label)}</b><small>${when(h.at)} · 데모증권</small></span>${right}</div>`;
+  }).join("") : `<div class="empty">아직 결제 내역이 없어요.</div>`;
+}
+
+async function refresh() {
+  try { summary = await api("GET", "/api/agent/summary"); } catch { return; }
+  if (summary.token?.symbol && summary.token.symbol !== SYM) { SYM = summary.token.symbol; relabel(document.body); }
+  if (!form || !dirty) fillForm(summary.settings);
+  render();
+}
+refresh();
+setInterval(refresh, 4000);
+</script>
+</body>
+</html>

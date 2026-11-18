@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>데모증권 파트너센터</title>
+<link rel="stylesheet" href="/app.css">
+<style>
+  .hello { font-size:15px; margin:2px 0 16px; display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; }
+  .kpis { display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:12px; margin-bottom:16px; }
+  .kpi { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px 18px; display:flex; gap:14px; align-items:center; }
+  .kpi .ic { width:42px; height:42px; border-radius:12px; display:grid; place-items:center; font-size:20px; flex:none; }
+  .kpi small { color:var(--muted); font-size:13px; display:block; }
+  .kpi b { font-size:24px; line-height:1.25; }
+  .kpi b span { font-size:14px; font-weight:600; }
+  .kpi .d { font-size:12px; color:var(--muted); }
+  .prods { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:12px; margin-bottom:16px; }
+  .prod { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:16px; }
+  .prod .h { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .prod .h b { font-size:15px; }
+  .prod .price { font-size:22px; font-weight:800; margin:8px 0 2px; }
+  .prod .price span { font-size:13px; font-weight:600; color:var(--muted); }
+  .prod .stat { display:flex; justify-content:space-between; border-top:1px solid var(--border); padding-top:10px; margin-top:10px; font-size:13px; }
+  .grid { display:grid; grid-template-columns:minmax(0, 1fr) 360px; gap:16px; align-items:start; }
+  .side { display:grid; gap:16px; }
+  .acct { background:linear-gradient(135deg, #1d8fa3, #2f5bd3); color:#fff; border-radius:16px; padding:18px; }
+  .acct small { opacity:.85; font-size:12.5px; }
+  .acct .bal { font-size:28px; font-weight:800; margin:2px 0 8px; overflow-wrap:anywhere; }
+  .acct .bal span { font-size:15px; }
+  .acct a { color:#fff; opacity:.9; }
+  .list .it.new { background:#effaf3; animation:fade 4s forwards; }
+  @keyframes fade { to { background:transparent; } }
+  .tx { font-family:ui-monospace, Consolas, Menlo, monospace; font-size:12px; min-width:92px; text-align:right; }
+  .list .amt { min-width:96px; }
+  @media (max-width: 1000px) { .kpis { grid-template-columns:repeat(2, minmax(0, 1fr)); } .prods { grid-template-columns:1fr; } .grid { grid-template-columns:1fr; } }
+  @media (max-width: 560px) { .kpis { grid-template-columns:1fr; } .tx { display:none; } }
+</style>
+</head>
+<body>
+<div class="top seller">
+  <span class="brand"><span class="lg">📈</span><span><b>데모증권 파트너센터</b><small>Open API 판매 관리</small></span></span>
+  <span class="net">Ethereum Sepolia</span>
+</div>
+<div class="wrap">
+  <div class="notice" id="notice" hidden></div>
+  <div class="hello"><span id="hello">오늘의 API 판매 현황이에요 📊</span><span class="muted" style="font-size:13px" id="date"></span></div>
+
+  <div class="kpis">
+    <div class="kpi"><span class="ic" style="background:var(--sec-soft)">💰</span><span><small>오늘 수익</small><b class="num" id="k-revenue">–</b><div class="d" id="k-revenue-d">&nbsp;</div></span></div>
+    <div class="kpi"><span class="ic" style="background:#e8eefc">📡</span><span><small>API 이용</small><b class="num" id="k-calls">–</b><div class="d" id="k-calls-d">&nbsp;</div></span></div>
+    <div class="kpi"><span class="ic" style="background:#f3ebfb">🤖</span><span><small>이용한 에이전트</small><b class="num" id="k-agents">–</b><div class="d">회원가입 없이 결제로 이용</div></span></div>
+    <div class="kpi"><span class="ic" style="background:var(--bad-bg)">🛡️</span><span><small>막아 낸 결제</small><b class="num" id="k-blocked">–</b><div class="d">피해 없음</div></span></div>
+  </div>
+
+  <div class="prods" id="products"></div>
+
+  <div class="grid">
+    <section class="panel list">
+      <h2>실시간 이용 내역</h2>
+      <div id="recent"><div class="empty">아직 이용 내역이 없어요.</div></div>
+    </section>
+    <div class="side">
+      <div class="acct"><small>정산 지갑</small><div class="bal num" id="balance">–</div><a class="addr" id="payto" target="_blank" rel="noopener"></a></div>
+      <section class="panel list">
+        <h2>막아 낸 결제</h2>
+        <div id="blocked"><div class="empty">막아 낸 결제가 없어요.</div></div>
+      </section>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast" hidden role="status" aria-live="polite"><span style="font-size:22px">🔔</span><span><b id="toast-amt"></b><small id="toast-label"></small></span></div>
+
+<script>
+const DECIMALS = 6n;
+const $ = (id) => document.getElementById(id);
+// Labels say "DEMO"; once the server reports the payment token, its symbol replaces it everywhere.
+let SYM = "DEMO";
+function relabel(root) {
+  if (SYM === "DEMO" || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode());) if (n.nodeValue.includes("DEMO")) n.nodeValue = n.nodeValue.replace(/DEMO/g, SYM);
+}
+new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) relabel(n.nodeType === Node.TEXT_NODE ? n.parentNode : n); })
+  .observe(document.body, { childList: true, subtree: true });
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function demo(raw, fixed) {
+  if (raw == null) return "–";
+  const v = BigInt(raw), unit = 10n ** DECIMALS;
+  let frac = (v % unit).toString().padStart(Number(DECIMALS), "0").replace(/0+$/, "");
+  if (fixed && frac.length < fixed) frac = frac.padEnd(fixed, "0");
+  const int = (v / unit).toLocaleString("en-US");
+  return int + (frac ? "." + frac : "");
+}
+const short = (a) => a ? `${a.slice(0, 6)}…${a.slice(-4)}` : "";
+const hm = (t) => new Date(t).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+async function api(url) {
+  const res = await fetch(url);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  return data;
+}
+
+$("date").textContent = new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" });
+
+const BLOCK_KIND = { replay: ["🔁", "같은 결제 재사용"], forged: ["✏️", "위조된 결제"], malformed: ["⚠️", "형식이 잘못된 결제"] };
+const STATUS = {
+  verified: `<span class="badge b-warn">정산 중</span>`,
+  settling: `<span class="badge b-warn">정산 중</span>`,
+  settled: `<span class="badge b-ok">정산 완료</span>`,
+  failed: `<span class="badge b-bad">정산 실패</span>`,
+};
+
+let seen = null; // nonces already shown, to spot new payments
+let toastTimer = null;
+function toast(p) {
+  $("toast-amt").textContent = `+${demo(p.amount)} DEMO`;
+  $("toast-label").textContent = `${p.label} · AI 에이전트`;
+  $("toast").hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => ($("toast").hidden = true), 5000);
+}
+
+function render(s) {
+  if (s.token?.symbol && s.token.symbol !== SYM) { SYM = s.token.symbol; relabel(document.body); }
+  const notes = [];
+  if (!s.settlementEnabled) notes.push("정산 키(FACILITATOR_PRIVATE_KEY)가 없어 결제 대금이 블록체인에서 정산되지 않아요.");
+  $("notice").hidden = !notes.length;
+  $("notice").textContent = notes.join(" ");
+
+  $("hello").innerHTML = s.today.calls
+    ? `오늘 AI 에이전트들이 데모증권 API를 <b>${s.today.calls}번</b> 이용했어요 📊`
+    : "오늘은 아직 API 이용이 없어요 📊";
+  $("k-revenue").innerHTML = `${demo(s.today.revenue)} <span>DEMO</span>`;
+  $("k-calls").innerHTML = `${s.today.calls}<span>회</span>`;
+  $("k-agents").innerHTML = `${s.today.agents}<span>명</span>`;
+  $("k-blocked").innerHTML = `${s.today.blocked}<span>건</span>`;
+  const top = [...s.products].sort((a, b) => b.count - a.count)[0];
+  $("k-calls-d").textContent = top?.count ? `${top.name} ${top.count}회` : " ";
+
+  $("products").innerHTML = s.products.map((p) => `
+    <div class="prod"><div class="h"><b>${p.icon} ${esc(p.name)}</b><span class="badge b-ok">판매 중</span></div>
+      <div class="price num">${p.price ? demo(p.price) : "–"} <span>DEMO / 회</span></div>
+      <div class="stat"><span class="muted">오늘 ${p.count}회</span><b class="num">${demo(p.revenue, 2)} DEMO</b></div></div>`).join("");
+
+  $("balance").innerHTML = `${demo(s.balance)} <span>DEMO</span>`;
+  $("payto").textContent = short(s.payTo);
+  $("payto").href = `${s.explorer}/address/${s.payTo}`;
+
+  const fresh = seen ? s.recent.filter((p) => !seen.has(p.nonce)) : [];
+  $("recent").innerHTML = s.recent.length ? s.recent.slice(0, 12).map((p) => {
+    const tx = p.status === "settled" && p.txHash
+      ? `<a class="tx" href="${s.explorer}/tx/${p.txHash}" target="_blank" rel="noopener">${short(p.txHash)} ↗</a>`
+      : `<span class="tx muted">–</span>`;
+    return `<div class="it ${fresh.some((f) => f.nonce === p.nonce) ? "new" : ""}" title="${esc(p.reason ?? "")}">
+      <span class="thumb">${p.icon}</span>
+      <span class="nm"><b>${esc(p.label)}</b><small>🤖 <span class="addr">${short(p.payer)}</span> · ${hm(p.at)}</small></span>
+      ${STATUS[p.status] ?? ""}${tx}<span class="amt num">+${demo(p.amount, 2)} DEMO</span></div>`;
+  }).join("") : `<div class="empty">아직 이용 내역이 없어요.</div>`;
+  if (fresh.length) toast(fresh[0]);
+  seen = new Set(s.recent.map((p) => p.nonce));
+
+  $("blocked").innerHTML = s.blocked.length ? s.blocked.slice(0, 6).map((b) => {
+    const [icon, name] = BLOCK_KIND[b.kind] ?? ["⚠️", "차단된 결제"];
+    return `<div class="it"><span class="thumb" style="background:var(--bad-bg)">${icon}</span>
+      <span class="nm"><b>${name}</b><small>${b.payer ? `<span class="addr">${short(b.payer)}</span> · ` : ""}${hm(b.at)}</small></span>
+      <span class="badge b-bad">차단</span></div>`;
+  }).join("") : `<div class="empty">막아 낸 결제가 없어요.</div>`;
+}
+
+async function refresh() {
+  try { render(await api("/api/seller/summary")); } catch {}
+}
+refresh();
+setInterval(refresh, 2500);
+</script>
+</body>
+</html>

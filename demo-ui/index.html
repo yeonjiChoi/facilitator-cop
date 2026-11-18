@@ -86,7 +86,7 @@
 <body>
 <header>
   <h1>x402 에이전트 결제 데모</h1>
-  <p>AI 에이전트가 유료 API를 호출하고, 위임받은 한도 안에서 DEMO 코인으로 결제하며, Facilitator가 가스를 대신 내고 온체인 정산합니다. (Ethereum Sepolia)</p>
+  <p>AI 에이전트가 유료 API를 호출하고, 위임받은 한도 안에서 DEMO 코인으로 결제하며, Facilitator가 가스를 대신 내고 온체인 정산합니다. (Ethereum Sepolia) · <a href="/agent">에이전트 화면 →</a> · <a href="/seller">판매자 화면 →</a></p>
 </header>
 
 <main>
@@ -206,6 +206,18 @@ const DECIMALS = 6n;
 
 const $ = (id) => document.getElementById(id);
 let info = null;
+
+// The labels say "DEMO"; once the server reports the payment token, show its symbol instead,
+// including in everything rendered later.
+let SYM = "DEMO";
+function relabel(root) {
+  if (SYM === "DEMO" || !root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode());) if (n.nodeValue.includes("DEMO")) n.nodeValue = n.nodeValue.replace(/DEMO/g, SYM);
+}
+new MutationObserver((mutations) => {
+  for (const m of mutations) for (const n of m.addedNodes) relabel(n.nodeType === Node.TEXT_NODE ? n.parentNode : n);
+}).observe(document.body, { childList: true, subtree: true });
 let flow = {};
 
 function fmt(raw) {
@@ -248,6 +260,7 @@ async function loadState() {
   const res = await api("GET", "/api/state");
   if (res.status !== 200) throw new Error(res.data?.error ?? "state failed");
   info = res.data;
+  if (info.token?.symbol && info.token.symbol !== SYM) { SYM = info.token.symbol; relabel(document.body); }
   $("agent-addr").innerHTML = link("address", info.agent.address);
   $("agent-demo").textContent = fmt(info.agent.demo);
   $("agent-eth").textContent = fmtEth(info.agent.eth);
